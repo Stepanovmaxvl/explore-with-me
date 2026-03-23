@@ -1,5 +1,6 @@
 package ru.practicum.stats.controller;
 
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -22,7 +23,7 @@ public class StatsController {
 
 	@PostMapping("/hit")
 	@ResponseStatus(HttpStatus.CREATED)
-	public void hit(@RequestBody EndpointHitDto body) {
+	public void hit(@Valid @RequestBody EndpointHitDto body) {
 		statsService.recordHit(body);
 	}
 

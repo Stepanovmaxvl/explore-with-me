@@ -14,6 +14,10 @@ mvn clean install -P check
 docker compose build
 docker compose up -d
 ```
+После остановить контейнер
+```bash
+docker compose down
+```
 ## Спецификации API
 - `ewm-stats-service-spec.json` — сервис статистики
 ## Дополнительная функциональность (будет реализована на этапе 3)
