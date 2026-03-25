@@ -1,15 +1,13 @@
 package ru.practicum.stats.service;
 
 import lombok.RequiredArgsConstructor;
-import org.springframework.jdbc.core.RowMapper;
-import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
-import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import ru.practicum.dto.EndpointHitDto;
 import ru.practicum.dto.ViewStatsDto;
 import ru.practicum.stats.model.Hit;
 import ru.practicum.stats.repository.HitRepository;
+import ru.practicum.stats.repository.ViewStatsProjection;
 
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
@@ -22,34 +20,7 @@ public class StatsServiceImpl implements StatsService {
 
 	private static final DateTimeFormatter FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
-	private static final RowMapper<ViewStatsDto> VIEW_STATS_MAPPER = (rs, rowNum) -> new ViewStatsDto(
-			rs.getString("app"),
-			rs.getString("uri"),
-			rs.getLong("hits")
-	);
-
-	private static final String ALL_URIS_COUNT_HITS = """
-			SELECT app, uri, COUNT(*) AS hits FROM hits
-			WHERE event_time >= :start AND event_time <= :end
-			GROUP BY app, uri ORDER BY hits DESC""";
-
-	private static final String ALL_URIS_COUNT_DISTINCT_IP = """
-			SELECT app, uri, COUNT(DISTINCT ip) AS hits FROM hits
-			WHERE event_time >= :start AND event_time <= :end
-			GROUP BY app, uri ORDER BY hits DESC""";
-
-	private static final String FILTERED_URIS_COUNT_HITS = """
-			SELECT app, uri, COUNT(*) AS hits FROM hits
-			WHERE event_time >= :start AND event_time <= :end AND uri IN (:uris)
-			GROUP BY app, uri ORDER BY hits DESC""";
-
-	private static final String FILTERED_URIS_COUNT_DISTINCT_IP = """
-			SELECT app, uri, COUNT(DISTINCT ip) AS hits FROM hits
-			WHERE event_time >= :start AND event_time <= :end AND uri IN (:uris)
-			GROUP BY app, uri ORDER BY hits DESC""";
-
 	private final HitRepository hitRepository;
-	private final NamedParameterJdbcTemplate namedJdbc;
 
 	@Override
 	@Transactional
@@ -76,21 +47,20 @@ public class StatsServiceImpl implements StatsService {
 			throw new IllegalArgumentException("start позже end");
 		}
 
-		MapSqlParameterSource params = new MapSqlParameterSource()
-				.addValue("start", startTime)
-				.addValue("end", endTime);
-
 		if (uris != null && !uris.isEmpty()) {
-			params.addValue("uris", uris);
 			if (unique) {
-				return namedJdbc.query(FILTERED_URIS_COUNT_DISTINCT_IP, params, VIEW_STATS_MAPPER);
+				return toDtos(hitRepository.findViewStatsCountDistinctIpForUris(startTime, endTime, uris));
 			}
-			return namedJdbc.query(FILTERED_URIS_COUNT_HITS, params, VIEW_STATS_MAPPER);
+			return toDtos(hitRepository.findViewStatsCountAllHitsForUris(startTime, endTime, uris));
 		}
 		if (unique) {
-			return namedJdbc.query(ALL_URIS_COUNT_DISTINCT_IP, params, VIEW_STATS_MAPPER);
+			return toDtos(hitRepository.findViewStatsCountDistinctIp(startTime, endTime));
 		}
-		return namedJdbc.query(ALL_URIS_COUNT_HITS, params, VIEW_STATS_MAPPER);
+		return toDtos(hitRepository.findViewStatsCountAllHits(startTime, endTime));
+	}
+
+	private static List<ViewStatsDto> toDtos(List<ViewStatsProjection> rows) {
+		return rows.stream().map(ViewStatsProjection::toDto).toList();
 	}
 
 	private static LocalDateTime parseRangeBoundary(String value, String name) {
