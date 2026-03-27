@@ -10,6 +10,7 @@ import org.springframework.web.bind.annotation.RestController;
 import ru.practicum.ewm.dto.EventFullDto;
 import ru.practicum.ewm.dto.EventShortDto;
 import ru.practicum.ewm.service.EventService;
+import ru.practicum.ewm.util.HttpRequestUtils;
 
 import java.util.List;
 
@@ -32,12 +33,12 @@ public class PublicEventController {
 			@RequestParam(defaultValue = "0") int from,
 			@RequestParam(defaultValue = "10") int size,
 			HttpServletRequest request) {
-		String ip = request.getRemoteAddr();
+		String ip = HttpRequestUtils.clientIp(request);
 		return eventService.searchPublic(text, categories, paid, rangeStart, rangeEnd, onlyAvailable, sort, from, size, ip);
 	}
 
 	@GetMapping("/{id}")
 	public EventFullDto getById(@PathVariable Long id, HttpServletRequest request) {
-		return eventService.getPublicById(id, request.getRemoteAddr());
+		return eventService.getPublicById(id, HttpRequestUtils.clientIp(request));
 	}
 }

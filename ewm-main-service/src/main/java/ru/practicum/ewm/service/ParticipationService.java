@@ -7,7 +7,6 @@ import ru.practicum.ewm.dto.EventRequestStatusUpdateRequest;
 import ru.practicum.ewm.dto.EventRequestStatusUpdateResult;
 import ru.practicum.ewm.dto.ParticipationRequestDto;
 import ru.practicum.ewm.exception.BadRequestException;
-import ru.practicum.ewm.exception.BusinessRuleException;
 import ru.practicum.ewm.exception.ConflictException;
 import ru.practicum.ewm.exception.NotFoundException;
 import ru.practicum.ewm.mapper.EwmDtoMapper;
@@ -69,9 +68,13 @@ public class ParticipationService {
 		if (limit > 0 && confirmed >= limit) {
 			throw new ConflictException("The participant limit has been reached");
 		}
-		RequestStatus status = RequestStatus.PENDING;
-		if (!event.isRequestModeration()) {
+		RequestStatus status;
+		if (limit == 0) {
 			status = RequestStatus.CONFIRMED;
+		} else if (!event.isRequestModeration()) {
+			status = RequestStatus.CONFIRMED;
+		} else {
+			status = RequestStatus.PENDING;
 		}
 		ParticipationRequest pr = ParticipationRequest.builder()
 				.created(LocalDateTime.now())
@@ -103,7 +106,7 @@ public class ParticipationService {
 		}
 		for (ParticipationRequest r : byId.values()) {
 			if (r.getStatus() != RequestStatus.PENDING) {
-				throw new BadRequestException("Request must have status PENDING");
+				throw new ConflictException("Request must have status PENDING");
 			}
 		}
 		List<ParticipationRequestDto> confirmedDtos = new ArrayList<>();
@@ -122,6 +125,9 @@ public class ParticipationService {
 		}
 		long limit = event.getParticipantLimit();
 		long confirmedCount = participationRepository.countByEventIdAndStatus(eventId, RequestStatus.CONFIRMED);
+		if (limit > 0 && confirmedCount >= limit) {
+			throw new ConflictException("The participant limit has been reached");
+		}
 		for (Long id : body.getRequestIds()) {
 			ParticipationRequest r = byId.get(id);
 			if (limit > 0 && confirmedCount >= limit) {
@@ -157,7 +163,7 @@ public class ParticipationService {
 		ParticipationRequest r = participationRepository.findByIdAndRequesterId(requestId, userId)
 				.orElseThrow(() -> new NotFoundException("Request with id=" + requestId + " was not found"));
 		if (r.getStatus() != RequestStatus.PENDING) {
-			throw new BusinessRuleException("FORBIDDEN", "Only pending requests can be cancelled");
+			throw new ConflictException("Only pending requests can be cancelled");
 		}
 		r.setStatus(RequestStatus.CANCELED);
 		participationRepository.save(r);

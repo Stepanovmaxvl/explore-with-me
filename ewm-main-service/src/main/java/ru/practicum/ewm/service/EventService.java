@@ -11,6 +11,7 @@ import ru.practicum.ewm.dto.EventShortDto;
 import ru.practicum.ewm.dto.NewEventDto;
 import ru.practicum.ewm.dto.UpdateEventAdminRequest;
 import ru.practicum.ewm.dto.UpdateEventUserRequest;
+import ru.practicum.ewm.exception.BadRequestException;
 import ru.practicum.ewm.exception.BusinessRuleException;
 import ru.practicum.ewm.exception.NotFoundException;
 import ru.practicum.ewm.mapper.EwmDtoMapper;
@@ -25,6 +26,8 @@ import ru.practicum.ewm.repository.EventSpecifications;
 import ru.practicum.ewm.repository.UserRepository;
 import ru.practicum.ewm.stats.StatsFacade;
 import ru.practicum.ewm.util.EwmDateTime;
+
+import java.time.format.DateTimeParseException;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -59,7 +62,13 @@ public class EventService {
 			event.setDescription(dto.getDescription());
 		}
 		if (dto.getEventDate() != null) {
-			event.setEventDate(EwmDateTime.parse(dto.getEventDate()));
+			LocalDateTime newDate = EwmDateTime.parse(dto.getEventDate());
+			if (!newDate.isAfter(LocalDateTime.now())) {
+				throw new BadRequestException(
+						"Field: eventDate. Error: должно содержать дату, которая еще не наступила. Value: "
+								+ dto.getEventDate());
+			}
+			event.setEventDate(newDate);
 		}
 		if (dto.getLocation() != null) {
 			event.setLocation(new Location(dto.getLocation().getLat(), dto.getLocation().getLon()));
@@ -108,8 +117,8 @@ public class EventService {
 	public List<EventFullDto> searchAdmin(List<Long> users, List<String> states, List<Long> categories,
 			String rangeStart, String rangeEnd, int from, int size) {
 		List<EventState> stateEnums = parseStates(states);
-		LocalDateTime rs = EwmDateTime.parse(rangeStart);
-		LocalDateTime re = EwmDateTime.parse(rangeEnd);
+		LocalDateTime rs = parseRangeDate(rangeStart, "rangeStart");
+		LocalDateTime re = parseRangeDate(rangeEnd, "rangeEnd");
 		Specification<Event> spec = Specification.where(EventSpecifications.initiatorIn(users))
 				.and(EventSpecifications.stateIn(stateEnums))
 				.and(EventSpecifications.categoryIn(categories))
@@ -121,9 +130,24 @@ public class EventService {
 
 	public List<EventShortDto> searchPublic(String text, List<Long> categories, Boolean paid,
 			String rangeStart, String rangeEnd, boolean onlyAvailable, String sort, int from, int size, String ip) {
+		if (text != null && text.isBlank()) {
+			throw new BadRequestException("Field: text. Error: size must be between 1 and 7000 if text is set.");
+		}
+		if (from < 0) {
+			throw new BadRequestException("Field: from. Error: must not be negative.");
+		}
+		if (size <= 0) {
+			throw new BadRequestException("Field: size. Error: must be positive.");
+		}
+		if (sort != null && !sort.isBlank() && !"EVENT_DATE".equals(sort) && !"VIEWS".equals(sort)) {
+			throw new BadRequestException("Invalid sort parameter");
+		}
+		LocalDateTime rs = parseRangeDate(rangeStart, "rangeStart");
+		LocalDateTime re = parseRangeDate(rangeEnd, "rangeEnd");
+		if (rs != null && re != null && rs.isAfter(re)) {
+			throw new BadRequestException("Field: rangeStart. Error: must not be after rangeEnd.");
+		}
 		statsFacade.recordHit("/events", ip);
-		LocalDateTime rs = EwmDateTime.parse(rangeStart);
-		LocalDateTime re = EwmDateTime.parse(rangeEnd);
 		Specification<Event> spec = Specification.where(EventSpecifications.stateIs(EventState.PUBLISHED))
 				.and(EventSpecifications.textSearch(text))
 				.and(EventSpecifications.categoryIn(categories))
@@ -173,7 +197,7 @@ public class EventService {
 		User initiator = ensureUser(userId);
 		Category category = categoryRepository.findById(dto.getCategory())
 				.orElseThrow(() -> new NotFoundException("Category with id=" + dto.getCategory() + " was not found"));
-		LocalDateTime eventDate = EwmDateTime.parse(dto.getEventDate());
+		LocalDateTime eventDate = parseEventDateRequired(dto.getEventDate());
 		validateEventDateNotTooSoon(eventDate);
 		int pl = dto.getParticipantLimit() == null ? 0 : dto.getParticipantLimit();
 		boolean rm = dto.getRequestModeration() == null || dto.getRequestModeration();
@@ -228,8 +252,8 @@ public class EventService {
 		if (dto.getDescription() != null) {
 			event.setDescription(dto.getDescription());
 		}
-		if (dto.getEventDate() != null) {
-			LocalDateTime ed = EwmDateTime.parse(dto.getEventDate());
+		if (dto.getEventDate() != null && !dto.getEventDate().isBlank()) {
+			LocalDateTime ed = parseEventDateRequired(dto.getEventDate());
 			validateEventDateNotTooSoon(ed);
 			event.setEventDate(ed);
 		}
@@ -271,9 +295,32 @@ public class EventService {
 
 	private void validateEventDateNotTooSoon(LocalDateTime eventDate) {
 		if (eventDate.isBefore(LocalDateTime.now().plusHours(2))) {
-			throw new BusinessRuleException("FORBIDDEN",
+			throw new BadRequestException(
 					"Field: eventDate. Error: должно содержать дату, которая еще не наступила. Value: "
 							+ EwmDateTime.format(eventDate));
+		}
+	}
+
+	private LocalDateTime parseEventDateRequired(String value) {
+		try {
+			LocalDateTime dt = EwmDateTime.parse(value);
+			if (dt == null) {
+				throw new BadRequestException("Field: eventDate. Error: must not be blank.");
+			}
+			return dt;
+		} catch (DateTimeParseException e) {
+			throw new BadRequestException("Field: eventDate. Error: invalid date format.");
+		}
+	}
+
+	private LocalDateTime parseRangeDate(String value, String field) {
+		if (value == null || value.isBlank()) {
+			return null;
+		}
+		try {
+			return LocalDateTime.parse(value.trim(), EwmDateTime.API_DATE_TIME);
+		} catch (DateTimeParseException e) {
+			throw new BadRequestException("Field: " + field + ". Error: invalid date format.");
 		}
 	}
 
@@ -286,7 +333,11 @@ public class EventService {
 		if (states == null || states.isEmpty()) {
 			return new ArrayList<>();
 		}
-		return states.stream().map(EventState::valueOf).collect(Collectors.toList());
+		try {
+			return states.stream().map(EventState::valueOf).collect(Collectors.toList());
+		} catch (IllegalArgumentException e) {
+			throw new BadRequestException("Invalid state parameter");
+		}
 	}
 
 	private EventFullDto toFull(Event e) {

@@ -38,7 +38,7 @@ public class StatsFacade {
 			return Collections.emptyMap();
 		}
 		List<String> uris = eventIds.stream().map(id -> "/events/" + id).toList();
-		List<ViewStatsDto> stats = statsClient.getStats(STATS_START, STATS_END, uris, false);
+		List<ViewStatsDto> stats = statsClient.getStats(STATS_START, STATS_END, uris, true);
 		Map<String, Long> byUri = stats.stream()
 				.collect(Collectors.toMap(ViewStatsDto::getUri, ViewStatsDto::getHits, (a, b) -> a));
 		Map<Long, Long> result = new HashMap<>();

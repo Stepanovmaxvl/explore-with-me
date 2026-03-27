@@ -29,7 +29,7 @@ public class ErrorHandler {
 
 	@ExceptionHandler(ConflictException.class)
 	public ResponseEntity<ApiError> handleConflict(ConflictException e) {
-		return build(HttpStatus.CONFLICT, "Integrity constraint has been violated.", e.getMessage());
+		return build(HttpStatus.CONFLICT, "For the requested operation the conditions are not met.", e.getMessage());
 	}
 
 	@ExceptionHandler(BusinessRuleException.class)
