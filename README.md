@@ -22,3 +22,5 @@ docker compose down
 - `ewm-stats-service-spec.json` — сервис статистики
 ## Дополнительная функциональность (будет реализована на этапе 3)
 Комментарии к событиям с модерацией
+## Pull Request
+https://github.com/Stepanovmaxvl/explore-with-me/pull/4
