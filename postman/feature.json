@@ -6,6 +6,182 @@
   },
   "item": [
     {
+      "name": "Setup Create User (201)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"email\": \"feature_{{$timestamp}}@mail.com\",\n  \"name\": \"Feature User\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/admin/users",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "admin",
+            "users"
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Status is 201\", function () {",
+              "    pm.response.to.have.status(201);",
+              "});",
+              "const user = pm.response.json();",
+              "pm.collectionVariables.set(\"userId\", user.id);"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Setup Create Category (201)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"name\": \"feature-cat-{{$timestamp}}\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/admin/categories",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "admin",
+            "categories"
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Status is 201\", function () {",
+              "    pm.response.to.have.status(201);",
+              "});",
+              "const category = pm.response.json();",
+              "pm.collectionVariables.set(\"categoryId\", category.id);"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Setup Create Event (201)",
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "const d = new Date(Date.now() + 3 * 60 * 60 * 1000);",
+              "const pad = n => String(n).padStart(2, '0');",
+              "const formatted = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;",
+              "pm.collectionVariables.set('eventDate', formatted);"
+            ]
+          }
+        },
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Status is 201\", function () {",
+              "    pm.response.to.have.status(201);",
+              "});",
+              "const event = pm.response.json();",
+              "pm.collectionVariables.set(\"eventId\", event.id);"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"annotation\": \"Setup annotation for comments feature\",\n  \"category\": {{categoryId}},\n  \"description\": \"Setup description for comments feature should be long enough.\",\n  \"eventDate\": \"{{eventDate}}\",\n  \"location\": {\n    \"lat\": 55.751244,\n    \"lon\": 37.618423\n  },\n  \"paid\": false,\n  \"participantLimit\": 0,\n  \"requestModeration\": true,\n  \"title\": \"Feature comments setup event\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/users/{{userId}}/events",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "users",
+            "{{userId}}",
+            "events"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Setup Publish Event (200)",
+      "request": {
+        "method": "PATCH",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"stateAction\": \"PUBLISH_EVENT\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/admin/events/{{eventId}}",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "admin",
+            "events",
+            "{{eventId}}"
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Status is 200\", function () {",
+              "    pm.response.to.have.status(200);",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
       "name": "Create Comment (201)",
       "request": {
         "method": "POST",
@@ -17,7 +193,7 @@
         ],
         "body": {
           "mode": "raw",
-          "raw": "{\n  \"text\": \"Очень полезное событие, обязательно приду\"\n}"
+          "raw": "{\n  \"text\": \"Useful event, thanks for organizing!\"\n}"
         },
         "url": {
           "raw": "{{baseUrl}}/users/{{userId}}/events/{{eventId}}/comments",
@@ -41,7 +217,15 @@
             "exec": [
               "pm.test(\"Status is 201\", function () {",
               "    pm.response.to.have.status(201);",
-              "});"
+              "});",
+              "const created = pm.response.json();",
+              "pm.test(\"Comment has PENDING status\", function () {",
+              "    pm.expect(created.status).to.eql(\"PENDING\");",
+              "});",
+              "pm.test(\"Comment is linked to created event\", function () {",
+              "    pm.expect(String(created.eventId)).to.eql(String(pm.collectionVariables.get(\"eventId\")));",
+              "});",
+              "pm.collectionVariables.set(\"commentId\", created.id);"
             ]
           }
         }
@@ -84,86 +268,15 @@
             "exec": [
               "pm.test(\"Status is 200\", function () {",
               "    pm.response.to.have.status(200);",
-              "});"
-            ]
-          }
-        }
-      ]
-    },
-    {
-      "name": "Approve Comment (200)",
-      "request": {
-        "method": "PATCH",
-        "header": [
-          {
-            "key": "Content-Type",
-            "value": "application/json"
-          }
-        ],
-        "body": {
-          "mode": "raw",
-          "raw": "{\n  \"status\": \"APPROVED\",\n  \"moderatorNote\": \"Одобрено\"\n}"
-        },
-        "url": {
-          "raw": "{{baseUrl}}/admin/comments/{{commentId}}",
-          "host": [
-            "{{baseUrl}}"
-          ],
-          "path": [
-            "admin",
-            "comments",
-            "{{commentId}}"
-          ]
-        }
-      },
-      "event": [
-        {
-          "listen": "test",
-          "script": {
-            "type": "text/javascript",
-            "exec": [
-              "pm.test(\"Status is 200\", function () {",
-              "    pm.response.to.have.status(200);",
-              "});"
-            ]
-          }
-        }
-      ]
-    },
-    {
-      "name": "Get Event Comments Public (200)",
-      "request": {
-        "method": "GET",
-        "url": {
-          "raw": "{{baseUrl}}/events/{{eventId}}/comments?from=0&size=10",
-          "host": [
-            "{{baseUrl}}"
-          ],
-          "path": [
-            "events",
-            "{{eventId}}",
-            "comments"
-          ],
-          "query": [
-            {
-              "key": "from",
-              "value": "0"
-            },
-            {
-              "key": "size",
-              "value": "10"
-            }
-          ]
-        }
-      },
-      "event": [
-        {
-          "listen": "test",
-          "script": {
-            "type": "text/javascript",
-            "exec": [
-              "pm.test(\"Status is 200\", function () {",
-              "    pm.response.to.have.status(200);",
+              "});",
+              "const list = pm.response.json();",
+              "pm.test(\"Pending comments list is array\", function () {",
+              "    pm.expect(Array.isArray(list)).to.be.true;",
+              "});",
+              "pm.test(\"Created comment is present in pending\", function () {",
+              "    const commentId = String(pm.collectionVariables.get(\"commentId\"));",
+              "    const hasComment = list.some(c => String(c.id) === commentId);",
+              "    pm.expect(hasComment).to.be.true;",
               "});"
             ]
           }
@@ -204,6 +317,107 @@
             "exec": [
               "pm.test(\"Status is 400\", function () {",
               "    pm.response.to.have.status(400);",
+              "});",
+              "const errorBody = pm.response.json();",
+              "pm.test(\"Error response has message\", function () {",
+              "    pm.expect(errorBody.message).to.be.a(\"string\").and.not.empty;",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Approve Comment (200)",
+      "request": {
+        "method": "PATCH",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"status\": \"APPROVED\",\n  \"moderatorNote\": \"Approved by moderator\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/admin/comments/{{commentId}}",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "admin",
+            "comments",
+            "{{commentId}}"
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Status is 200\", function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "const approved = pm.response.json();",
+              "pm.test(\"Comment is approved\", function () {",
+              "    pm.expect(approved.status).to.eql(\"APPROVED\");",
+              "});",
+              "pm.test(\"Moderator note is stored\", function () {",
+              "    pm.expect(approved.moderatorNote).to.eql(\"Approved by moderator\");",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Get Event Comments Public (200)",
+      "request": {
+        "method": "GET",
+        "url": {
+          "raw": "{{baseUrl}}/events/{{eventId}}/comments?from=0&size=10",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "events",
+            "{{eventId}}",
+            "comments"
+          ],
+          "query": [
+            {
+              "key": "from",
+              "value": "0"
+            },
+            {
+              "key": "size",
+              "value": "10"
+            }
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Status is 200\", function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "const publicComments = pm.response.json();",
+              "pm.test(\"Public comments list is array\", function () {",
+              "    pm.expect(Array.isArray(publicComments)).to.be.true;",
+              "});",
+              "pm.test(\"Approved comment is visible in public list\", function () {",
+              "    const commentId = String(pm.collectionVariables.get(\"commentId\"));",
+              "    const target = publicComments.find(c => String(c.id) === commentId);",
+              "    pm.expect(target).to.exist;",
+              "    pm.expect(target.status).to.eql(\"APPROVED\");",
               "});"
             ]
           }
@@ -218,6 +432,10 @@
     },
     {
       "key": "userId",
+      "value": "1"
+    },
+    {
+      "key": "categoryId",
       "value": "1"
     },
     {
