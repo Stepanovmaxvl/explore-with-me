@@ -1,5 +1,6 @@
 DROP TABLE IF EXISTS compilation_events CASCADE;
 DROP TABLE IF EXISTS participation_requests CASCADE;
+DROP TABLE IF EXISTS comments CASCADE;
 DROP TABLE IF EXISTS events CASCADE;
 DROP TABLE IF EXISTS compilations CASCADE;
 DROP TABLE IF EXISTS categories CASCADE;
@@ -63,3 +64,17 @@ CREATE TABLE participation_requests (
 
 CREATE INDEX idx_participation_event ON participation_requests (event_id);
 CREATE INDEX idx_participation_requester ON participation_requests (requester_id);
+
+CREATE TABLE comments (
+	id BIGSERIAL PRIMARY KEY,
+	text VARCHAR(2000) NOT NULL,
+	created TIMESTAMP NOT NULL,
+	status VARCHAR(20) NOT NULL,
+	moderator_note VARCHAR(1000),
+	event_id BIGINT NOT NULL REFERENCES events (id) ON DELETE CASCADE,
+	author_id BIGINT NOT NULL REFERENCES users (id) ON DELETE CASCADE
+);
+
+CREATE INDEX idx_comments_event ON comments (event_id);
+CREATE INDEX idx_comments_author ON comments (author_id);
+CREATE INDEX idx_comments_status ON comments (status);

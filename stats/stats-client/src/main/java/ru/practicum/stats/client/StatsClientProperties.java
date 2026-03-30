@@ -7,8 +7,5 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 @ConfigurationProperties(prefix = "stats-server")
 public class StatsClientProperties {
 
-	/**
-	 * Базовый URL сервиса статистики (без завершающего слэша).
-	 */
 	private String url = "http://localhost:9090";
 }

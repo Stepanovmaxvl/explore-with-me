@@ -1,6 +1,7 @@
 package ru.practicum.ewm.mapper;
 
 import ru.practicum.ewm.dto.CategoryDto;
+import ru.practicum.ewm.dto.CommentDto;
 import ru.practicum.ewm.dto.EventFullDto;
 import ru.practicum.ewm.dto.EventShortDto;
 import ru.practicum.ewm.dto.LocationDto;
@@ -8,6 +9,7 @@ import ru.practicum.ewm.dto.ParticipationRequestDto;
 import ru.practicum.ewm.dto.UserDto;
 import ru.practicum.ewm.dto.UserShortDto;
 import ru.practicum.ewm.model.Category;
+import ru.practicum.ewm.model.Comment;
 import ru.practicum.ewm.model.Event;
 import ru.practicum.ewm.model.Location;
 import ru.practicum.ewm.model.ParticipationRequest;
@@ -79,6 +81,18 @@ public final class EwmDtoMapper {
 				.event(r.getEvent().getId())
 				.requester(r.getRequester().getId())
 				.status(r.getStatus().name())
+				.build();
+	}
+
+	public static CommentDto toCommentDto(Comment c) {
+		return CommentDto.builder()
+				.id(c.getId())
+				.eventId(c.getEvent().getId())
+				.author(toUserShort(c.getAuthor()))
+				.text(c.getText())
+				.created(c.getCreated())
+				.status(c.getStatus().name())
+				.moderatorNote(c.getModeratorNote())
 				.build();
 	}
 }
